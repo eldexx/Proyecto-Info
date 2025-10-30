@@ -32,4 +32,4 @@ print("\n--- Lista final de aeropuertos ---")
 for a in airports:
     PrintAirport(a)
 
-print("\n✅ Step 4 completado correctamente.")
+print("\n Step 4 completado correctamente.")
