@@ -80,7 +80,7 @@ def LoadAirports(filename):
     try:
         f = open(filename, "r")
     except FileNotFoundError:
-        print("❌ No se encontró el archivo:", filename)
+        print("No se encontró el archivo:", filename)
         return airports  # lista vacía
 
     lines = f.readlines()
@@ -110,7 +110,7 @@ def LoadAirports(filename):
 
         airports.append(airport)
 
-    print(f"✅ Se cargaron {len(airports)} aeropuertos del archivo {filename}")
+    print(f"Se cargaron {len(airports)} aeropuertos del archivo {filename}")
     return airports
 
 
