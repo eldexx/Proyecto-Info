@@ -168,3 +168,28 @@ def RemoveAirport(airports, code):
 
     return 0
 
+import matplotlib.pyplot as plt
+
+def PlotAirports(airports):
+    schengen = sum(a.schengen for a in airports)
+    non_schengen = len(airports) - schengen
+    plt.bar(["Schengen", "Non-Schengen"], [schengen, non_schengen])
+    plt.title("Airports by Schengen Status")
+    plt.show()
+
+def MapAirports(airports):
+    with open("airports.kml", "w") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        f.write('<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n')
+        for a in airports:
+            color = "green" if a.schengen else "red"
+            f.write(f"""
+<Placemark>
+<name>{a.code}</name>
+<Style><IconStyle><color>{color}</color></IconStyle></Style>
+<Point><coordinates>{a.lon},{a.lat},0</coordinates></Point>
+</Placemark>
+""")
+        f.write('</Document>\n</kml>')
+
+
