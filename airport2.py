@@ -54,7 +54,7 @@ def LoadAirports(filename):
         print("No se encontró el archivo:", filename)
         return airports
 
-    for line in lines[1:]:  # skip header
+    for line in lines[1:]: 
         if line.strip() == "":
             continue
 
