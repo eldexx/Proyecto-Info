@@ -56,7 +56,7 @@ def LoadAirports(filename):
     return airports
   
 def convertir_coordenada(cadena):
-    """Convierte una coordenada tipo N412944 o W0734429 a grados decimales correctos."""
+    
     hemisferio = cadena[0]
 
    
@@ -80,7 +80,7 @@ def convertir_coordenada(cadena):
 
 
 def LoadAirports(filename):
-    """Lee un archivo de texto con la lista de aeropuertos y devuelve una lista de objetos Airport."""
+    
     airports = []
 
     try:
@@ -122,7 +122,7 @@ def LoadAirports(filename):
 
 
 def SaveSchengenAirports(airports, filename):
-    """Guarda solo los aeropuertos Schengen en un archivo nuevo"""
+   
     schengen_airports = []
     for a in airports:
         if a.schengen:
