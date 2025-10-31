@@ -1,8 +1,8 @@
 from tkinter import *
 from tkinter import messagebox, simpledialog
-from airport import *
+from airport2 import *
 
-airports = []  
+airports = {}
 
 
 def load_airports():
@@ -23,7 +23,8 @@ def show_airports():
     texto = Text(ventana, width=60, height=20)
     texto.pack()
 
-    for a in airports:
+    # Iterate over the values (Airport objects) instead of keys (strings)
+    for a in airports.values():
         texto.insert(END, f"{a.code}: {a.latitude:.4f}, {a.longitude:.4f}, Schengen={a.schengen}\n")
 
     texto.config(state=DISABLED)
@@ -31,18 +32,46 @@ def show_airports():
 
 def add_airport():
     global airports
-    code = simpledialog.askstring("Add Airport", "Código del aeropuerto (ej: LEBL):")
-    if not code:
-        return
-    lat = simpledialog.askfloat("Add Airport", "Latitud (ej: 41.297):")
-    lon = simpledialog.askfloat("Add Airport", "Longitud (ej: 2.083):")
+    while True:
+        code = simpledialog.askstring(title="Add Airport", prompt="Código del aeropuerto (ej: LEBL):")
+        if code is None:
+            return # Usuario ha cancelado — salir de la funcion
+        if not code.strip():
+            messagebox.showerror("Error", "Debes introducir un código de aeropuerto.")
+        else:
+            break  # codigo valido
+    # latitud
+    while True:
+        lat_txt = simpledialog.askstring(title="Add Airport", prompt="Latitud (ej: 41.297):")
+        if lat_txt is None:
+            return
+        try:
+            lat = float(lat_txt)
+            break
+        except ValueError:
+            messagebox.showerror("Error", "Necesitas introducir un valor numérico válido para la latitud.")
+
+    # longitud
+    while True:
+        lon_txt = simpledialog.askstring(title="Add Airport", prompt="Longitud (ej: 2.083):")
+        if lon_txt is None:
+            return
+        try:
+            lon = float(lon_txt)
+            break
+        except ValueError:
+            messagebox.showerror("Error", "Necesitas introducir un valor numérico válido para la longitud.")
 
     a = Airport()
     a.code = code.upper()
     a.latitude = lat
     a.longitude = lon
     SetSchengen(a)
-    AddAirport(airports, a)
+    result = AddAirport(airports, a)
+    if result == 0:
+        messagebox.showinfo("Éxito", f"Aeropuerto {a.code} añadido correctamente.")
+    else:
+        messagebox.showerror("Error", f"No se pudo añadir el aeropuerto {a.code}.")
 
 
 def delete_airport():
@@ -50,7 +79,12 @@ def delete_airport():
     code = simpledialog.askstring("Delete Airport", "Código del aeropuerto a eliminar:")
     if not code:
         return
-    RemoveAirport(airports, code.upper())
+
+    result = RemoveAirport(airports, code.upper())
+    if result == 0:
+        messagebox.showinfo("Éxito", f"Aeropuerto {code.upper()} eliminado correctamente.")
+    else:
+        messagebox.showerror("Error", f"No se encontró el aeropuerto {code.upper()}.")
 
 
 def set_schengen_all():
@@ -58,7 +92,8 @@ def set_schengen_all():
         messagebox.showwarning("Set Schengen", "No hay aeropuertos cargados.")
         return
 
-    for a in airports:
+    # Iterate over the values (Airport objects) instead of keys (strings)
+    for a in airports.values():
         SetSchengen(a)
     messagebox.showinfo("Set Schengen", "Se actualizó el atributo Schengen de todos los aeropuertos.")
 
@@ -67,7 +102,7 @@ def save_schengen():
     if len(airports) == 0:
         messagebox.showwarning("Save Schengen", "No hay aeropuertos cargados.")
         return
-    SaveSchengenAirports(airports, "schengen_airports.txt")
+    SaveSchengenAirports(airports.values(), "schengen_airports.txt")  # Pass values instead of dict
     messagebox.showinfo("Save Schengen", "Archivo 'schengen_airports.txt' guardado correctamente.")
 
 
@@ -75,14 +110,14 @@ def plot_airports():
     if len(airports) == 0:
         messagebox.showwarning("Plot Airports", "No hay aeropuertos cargados.")
         return
-    PlotAirports(airports)
+    PlotAirports(airports.values())  # Pass values instead of dict
 
 
 def map_airports():
     if len(airports) == 0:
         messagebox.showwarning("Map Airports", "No hay aeropuertos cargados.")
         return
-    MapAirports(airports)
+    MapAirports(airports.values())  # Pass values instead of dict
     messagebox.showinfo("Map Airports", "Archivo 'airports_map.kml' creado.\nÁbrelo con Google Earth.")
 
 

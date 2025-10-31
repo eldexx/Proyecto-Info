@@ -19,41 +19,6 @@ def SetSchengen (airport):
 
 def PrintAirport (airport):
     print(airport.__dict__)
-
-def LoadAirports(filename):
-    try:
-        f = open(filename, "r")
-        lines = f.readlines()
-    except FileNotFoundError:
-        return []
-
-    airports = []
-    while lines != "":
-        parts = lines.split(" ")
-        code = parts[0]
-        lat_str = parts[1]
-        lon_str = parts[2]
-
-        hem = lat_str[0]
-        deg = int(lat_str[1:3])
-        min = int(lat_str[3:5])
-        sec = int(lat_str[5:7])
-        lat = deg + min / 60 + sec / 3600
-        if hem == "S":
-            lat = -lat
-
-        hem = int(lon_str[0])
-        deg = int(lon_str[1:4])
-        min = int(lon_str[4:6])
-        sec = int(lon_str[6:8])
-        lon = deg + min / 60 + sec / 3600
-        if hem == "W":
-            lon = -lon
-
-        airports.append((code, lat, lon))
-
-        lines = f.readline()
-    return airports
   
 def convertir_coordenada(cadena):
     
@@ -80,51 +45,46 @@ def convertir_coordenada(cadena):
 
 
 def LoadAirports(filename):
-    
-    airports = []
+    airports = {}
 
     try:
-        f = open(filename, "r")
+        with open(filename, "r") as f:
+            lines = f.readlines()
     except FileNotFoundError:
         print("No se encontró el archivo:", filename)
-        return airports  
+        return airports
 
-    lines = f.readlines()
-    f.close()
-
-   
-    for line in lines[1:]:
+    for line in lines[1:]:  # skip header
         if line.strip() == "":
-            continue 
+            continue
 
         parts = line.strip().split()
         if len(parts) != 3:
-            continue  
+            continue
 
         code = parts[0]
         lat_str = parts[1]
         lon_str = parts[2]
 
-       
         lat = convertir_coordenada(lat_str)
         lon = convertir_coordenada(lon_str)
 
-        airport = Airport()
-        airport.code = code
-        airport.latitude = lat
-        airport.longitude = lon
-        SetSchengen(airport)
+        a = Airport()
+        a.code = code.upper()
+        a.latitude = lat
+        a.longitude = lon
+        SetSchengen(a)
 
-        airports.append(airport)
+        airports[code] = a
 
     print(f"Se cargaron {len(airports)} aeropuertos del archivo {filename}")
     return airports
 
 
-def SaveSchengenAirports(airports, filename):
+def SaveSchengenAirports(airports_list, filename):
    
     schengen_airports = []
-    for a in airports:
+    for a in airports_list:
         if a.schengen:
             schengen_airports.append(a)
 
@@ -143,51 +103,38 @@ def SaveSchengenAirports(airports, filename):
 
 
 def AddAirport(airports, airport):
-   
-    existe = False
-    for a in airports:
-        if a.code == airport.code:
-            existe = True
-            break
-
-    if existe:
+    if airport.code in airports:
         print(f"El aeropuerto {airport.code} ya existe.")
         return -1
 
-    airports.append(airport)
+    airports[airport.code] = airport
     print(f"Aeropuerto {airport.code} agregado correctamente.")
     return 0
 
 
-def RemoveAirport(airports, code):
-   
-    encontrado = False
-    for a in airports:
-        if a.code == code:
-            airports.remove(a)
-            encontrado = True
-            print(f"Aeropuerto {code} eliminado.")
-            break
 
-    if not encontrado:
+def RemoveAirport(airports, code):
+    if code in airports:
+        del airports[code]
+        print(f"Aeropuerto {code} eliminado.")
+        return 0
+    else:
         print(f"No se encontró el aeropuerto {code}.")
         return -1
 
-    return 0
-
 import matplotlib.pyplot as plt
 
-def PlotAirports(airports):
-    schengen = sum(a.schengen for a in airports)
-    non_schengen = len(airports) - schengen
+def PlotAirports(airports_list):
+    schengen = sum(a.schengen for a in airports_list)
+    non_schengen = len(airports_list) - schengen
     plt.bar(["Schengen", "Non-Schengen"], [schengen, non_schengen])
     plt.title("Airports by Schengen Status")
     plt.show()
 
 
-def MapAirports(airports):
+def MapAirports(airports_list):
    
-    if len(airports) == 0:
+    if len(airports_list) == 0:
         print("No hay aeropuertos para mostrar en el mapa.")
         return
 
@@ -199,7 +146,7 @@ def MapAirports(airports):
         f.write("  <Document>\n")
         f.write("    <name>Airport Map</name>\n")
 
-        for a in airports:
+        for a in airports_list:
             
             color = "ff00ff00" if a.schengen else "ff0000ff"
 
