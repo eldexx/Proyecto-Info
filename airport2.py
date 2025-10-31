@@ -54,21 +54,17 @@ def LoadAirports(filename):
 
         lines = f.readline()
     return airports
-    # ================================================
-# STEP 3 - Manejo de listas de aeropuertos
-# ================================================
-
-# Función para convertir coordenadas del formato N635906 a decimal
+  
 def convertir_coordenada(cadena):
     """Convierte una coordenada tipo N412944 o W0734429 a grados decimales correctos."""
     hemisferio = cadena[0]
 
-    # Latitud: 2 dígitos de grados (N o S)
+   
     if hemisferio in ['N', 'S']:
         grados = int(cadena[1:3])
         minutos = int(cadena[3:5])
         segundos = int(cadena[5:7])
-    # Longitud: 3 dígitos de grados (E o W)
+  
     else:
         grados = int(cadena[1:4])
         minutos = int(cadena[4:6])
@@ -76,7 +72,7 @@ def convertir_coordenada(cadena):
 
     decimal = grados + (minutos / 60) + (segundos / 3600)
 
-    # Sur y Oeste deben ser negativos
+   
     if hemisferio in ['S', 'W']:
         decimal = -decimal
 
@@ -90,26 +86,26 @@ def LoadAirports(filename):
     try:
         f = open(filename, "r")
     except FileNotFoundError:
-        print("❌ No se encontró el archivo:", filename)
-        return airports  # lista vacía
+        print("No se encontró el archivo:", filename)
+        return airports  
 
     lines = f.readlines()
     f.close()
 
-    # Saltamos la primera línea (encabezado)
+   
     for line in lines[1:]:
         if line.strip() == "":
-            continue  # ignorar líneas vacías
+            continue 
 
         parts = line.strip().split()
         if len(parts) != 3:
-            continue  # si no hay tres datos, se salta
+            continue  
 
         code = parts[0]
         lat_str = parts[1]
         lon_str = parts[2]
 
-        # ✅ Conversión corregida y precisa
+       
         lat = convertir_coordenada(lat_str)
         lon = convertir_coordenada(lon_str)
 
@@ -121,7 +117,7 @@ def LoadAirports(filename):
 
         airports.append(airport)
 
-    print(f"✅ Se cargaron {len(airports)} aeropuertos del archivo {filename}")
+    print(f"Se cargaron {len(airports)} aeropuertos del archivo {filename}")
     return airports
 
 
@@ -147,7 +143,7 @@ def SaveSchengenAirports(airports, filename):
 
 
 def AddAirport(airports, airport):
-    """Agrega un aeropuerto a la lista si no existe ya"""
+   
     existe = False
     for a in airports:
         if a.code == airport.code:
@@ -164,7 +160,7 @@ def AddAirport(airports, airport):
 
 
 def RemoveAirport(airports, code):
-    """Elimina un aeropuerto de la lista por su código"""
+   
     encontrado = False
     for a in airports:
         if a.code == code:
@@ -190,9 +186,9 @@ def PlotAirports(airports):
 
 
 def MapAirports(airports):
-    """Crea un archivo .kml para visualizar los aeropuertos en Google Earth."""
+   
     if len(airports) == 0:
-        print("⚠️ No hay aeropuertos para mostrar en el mapa.")
+        print("No hay aeropuertos para mostrar en el mapa.")
         return
 
     filename = "airports_map.kml"
@@ -204,7 +200,7 @@ def MapAirports(airports):
         f.write("    <name>Airport Map</name>\n")
 
         for a in airports:
-            # Color verde si es Schengen, rojo si no
+            
             color = "ff00ff00" if a.schengen else "ff0000ff"
 
             f.write("    <Placemark>\n")
@@ -219,7 +215,7 @@ def MapAirports(airports):
             f.write("        </IconStyle>\n")
             f.write("      </Style>\n")
             f.write("      <Point>\n")
-            # 👇 ESTA ES LA LÍNEA CORRECTA (usa latitude y longitude)
+           
             f.write(f"        <coordinates>{a.longitude},{a.latitude},0</coordinates>\n")
             f.write("      </Point>\n")
             f.write("    </Placemark>\n")
@@ -227,7 +223,7 @@ def MapAirports(airports):
         f.write("  </Document>\n")
         f.write("</kml>\n")
 
-    print(f"🌍 Archivo '{filename}' creado correctamente.")
+    print(f"Archivo '{filename}' creado correctamente.")
 
 
 
