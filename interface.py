@@ -1,213 +1,296 @@
 from tkinter import *
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 
 from aircraft import *
 from airport import *
-from LEBL import BarcelonaAP, LoadAirportStructure, AssignGate, GateOccupancy
+from LEBL import BarcelonaAP, LoadAirportStructure, AssignGate, GateOccupancy, PlotDayOccupancy
 
+# Variables Globales
 airports = []
-aircrafts = []
-bcn = None  # aeropuerto LEBL.txt versión 3
+aircrafts = []      
+departures = []     
+merged_flights = [] 
+bcn = None 
 
-# ==== GESTIÓN DE AEROPUERTOS NORMAL ====
+# ==========================================
+# GESTIÓN DE AEROPUERTOS
+# ==========================================
 def load_airports():
     global airports
     airports = LoadAirports("airports.txt")
-    messagebox.showinfo("Info", f"Cargados {len(airports)} aeropuertos")
+    if len(airports) > 0:
+        messagebox.showinfo("Info", "Cargados " + str(len(airports)) + " aeropuertos.")
+    else:
+        messagebox.showwarning("Aviso", "No se cargaron aeropuertos.")
+
+def save_airports():
+    if len(airports) == 0:
+        messagebox.showwarning("Error", "No hay datos para guardar.")
+        return
+    SaveSchengenAirports(airports, "schengen_airports.txt")
+    messagebox.showinfo("Info", "Guardado en 'schengen_airports.txt'")
+
+def add_airport():
+    code = simpledialog.askstring("Añadir", "Código ICAO (ej: KJFK):")
+    if code == None:
+        return
+    
+    lat = simpledialog.askfloat("Añadir", "Latitud (Decimal):")
+    if lat == None:
+        return
+    
+    lon = simpledialog.askfloat("Añadir", "Longitud (Decimal):")
+    if lon == None:
+        return
+
+    nuevo = Airport()
+    nuevo.code = code.upper()
+    nuevo.latitude = lat
+    nuevo.longitude = lon
+    SetSchengen(nuevo)
+    
+    res = AddAirport(airports, nuevo)
+    if res == 0:
+        messagebox.showinfo("Exito", "Aeropuerto añadido.")
+    else:
+        messagebox.showerror("Error", "El aeropuerto ya existe.")
+
+def remove_airport():
+    code = simpledialog.askstring("Eliminar", "Código ICAO a borrar:")
+    if code == None:
+        return
+    
+    res = RemoveAirport(airports, code.upper())
+    if res == 0:
+        messagebox.showinfo("Exito", "Aeropuerto eliminado.")
+    else:
+        messagebox.showerror("Error", "No encontrado.")
 
 def show_airports():
-    if not airports:
-        messagebox.showwarning("Error", "Primero carga aeropuertos")
+    if len(airports) == 0:
+        messagebox.showwarning("Error", "Carga aeropuertos primero.")
         return
     win = Toplevel()
-    win.title("Aeropuertos")
+    win.title("Lista de Aeropuertos")
     text = Text(win, width=60, height=15)
     text.pack()
-    for a in airports:
-        text.insert(END, f"{a.code} - Lat: {a.latitude:.4f}, Lon: {a.longitude:.4f}, Schengen: {a.schengen}\n")
+    
+    for i in range(len(airports)):
+        a = airports[i]
+        linea = "✈ " + a.code + " | Lat: " + str(a.latitude) + " | Lon: " + str(a.longitude) + "\n"
+        text.insert(END, linea)
+        
     text.config(state=DISABLED)
 
+def map_airports():
+    if len(airports) == 0:
+        return
+    MapAirports(airports)
+    messagebox.showinfo("Info", "Mapa 'airports_map.kml' creado.")
+
 def plot_airports():
-    if not airports:
-        messagebox.showwarning("Error", "Primero carga aeropuertos")
+    if len(airports) == 0: 
+        messagebox.showwarning("Error", "Carga aeropuertos primero.")
         return
     PlotAirports(airports)
 
-def map_airports():
-    if not airports:
-        messagebox.showwarning("Error", "Primero carga aeropuertos")
-        return
-    MapAirports(airports)
-    messagebox.showinfo("Info", "Mapa airports_map.kml creado")
 
-
-# ==== GESTIÓN DE LEBL.txt V3 ====
+# ==========================================
+# GESTIÓN ESTRUCTURA LEBL
+# ==========================================
 def load_lebl_structure():
     global bcn
     bcn = LoadAirportStructure("LEBL.txt")
-    if bcn:
-        messagebox.showinfo("Info", "Estructura LEBL.txt cargada correctamente")
+    if bcn != None:
+        messagebox.showinfo("Info", "Estructura LEBL cargada.")
     else:
-        messagebox.showerror("Error", "No se pudo cargar la estructura de LEBL.txt")
+        messagebox.showerror("Error", "No se encontró 'LEBL.txt'.")
 
 def show_gate_occupancy():
-    if bcn is None:
-        messagebox.showwarning("Error", "Primero carga la estructura del aeropuerto")
+    if bcn == None:
+        messagebox.showwarning("Error", "Carga la estructura primero.")
         return
     win = Toplevel()
-    win.title("Ocupación Gates LEBL.txt")
-    text = Text(win, width=80, height=20)
+    win.title("Ocupación de Puertas")
+    text = Text(win, width=85, height=20)
     text.pack()
-    text.insert(END, "Terminal\tArea\tTipo\tGate\tOcupado\tID Aeronave\n")
-    text.insert(END, "---------------------------------------------------------\n")
-    for dato in GateOccupancy(bcn):
-        ocupado = "Sí" if dato["ocupado"] else "No"
-        id_aeronave = dato["id_aeronave"] if dato["id_aeronave"] else ""
-        fila = f'{dato["terminal"]}\t{dato["area"]}\t{dato["tipo"]}\t{dato["gate"]}\t{ocupado}\t{id_aeronave}\n'
-        text.insert(END, fila)
+    
+    text.insert(END, "GATE      ESTADO         AVIÓN          LIBERA (min)\n")
+    text.insert(END, "====================================================\n")
+    
+    datos = GateOccupancy(bcn)
+    
+    for i in range(len(datos)):
+        dato = datos[i]
+        
+        if dato["ocupado"] == True:
+            oc = "OCUPADO"
+        else:
+            oc = "Libre"
+            
+        avi = "---"
+        if "id" in dato:
+            if dato["id"] != None:
+                avi = dato["id"]
+        
+        free = "-"
+        if "free_at" in dato:
+            free = str(dato["free_at"])
+        
+        linea = dato["gate"] + "\t" + oc + "\t" + avi + "\t" + free + "\n"
+        text.insert(END, linea)
+        
     text.config(state=DISABLED)
 
-def assign_gates_to_arrivals():
-    if bcn is None:
-        messagebox.showwarning("Error", "Carga primero la estructura LEBL.txt")
+def assign_gates_static():
+    if bcn == None or len(aircrafts) == 0:
+        messagebox.showwarning("Error", "Faltan datos.")
         return
-    if not aircrafts:
-        messagebox.showwarning("Error", "Carga primero los vuelos")
-        return
+        
+    # Limpieza previa
+    for i in range(len(bcn.terminales)):
+        t = bcn.terminales[i]
+        for j in range(len(t.boarding_areas)):
+            ba = t.boarding_areas[j]
+            for k in range(len(ba.gates)):
+                ba.gates[k].liberar()
+            
     asignados = 0
-    errores = 0
-    for avion in aircrafts:
+    for i in range(len(aircrafts)):
+        avion = aircrafts[i]
         res = AssignGate(bcn, avion)
         if res == 0:
-            asignados += 1
-        else:
-            errores += 1
-    messagebox.showinfo("Info", f"Asig. automáticas: {asignados}. Errores: {errores}")
+            asignados = asignados + 1
+            
+    messagebox.showinfo("Resultado", "Asignados: " + str(asignados))
 
-# ==== GESTIÓN DE VUELOS NORMAL ====
+
+# ==========================================
+# GESTIÓN VUELOS Y SIMULACIÓN
+# ==========================================
 def load_arrivals():
     global aircrafts
     aircrafts = LoadArrivals("arrivals.txt")
-    messagebox.showinfo("Info", f"Cargados {len(aircrafts)} vuelos")
+    messagebox.showinfo("Info", "Cargadas " + str(len(aircrafts)) + " llegadas.")
 
-def show_flights():
-    if not aircrafts:
-        messagebox.showwarning("Error", "Primero carga vuelos")
-        return
-    win = Toplevel()
-    win.title("Vuelos")
-    text = Text(win, width=70, height=15)
-    text.pack()
-    text.insert(END, "ID | Origen | Hora | Aerolínea | Schengen\n")
-    text.insert(END, "--------|--------|-------|-----------|---------\n")
-    for a in aircrafts:
-        schengen = "SÍ" if a.schengen else "NO"
-        text.insert(END, f"{a.id:7} | {a.origin:6} | {a.landing_time:5} | {a.airline:9} | {schengen:8}\n")
-    text.config(state=DISABLED)
+def load_departures():
+    global departures
+    departures = LoadDepartures("departures.txt")
+    messagebox.showinfo("Info", "Cargadas " + str(len(departures)) + " salidas.")
 
-def plot_arrivals():
-    if not aircrafts:
-        messagebox.showwarning("Error", "Primero carga vuelos")
+def merge_movements():
+    global merged_flights
+    if len(aircrafts) == 0 and len(departures) == 0:
+        messagebox.showwarning("Error", "Carga Llegadas y Salidas primero.")
         return
-    PlotArrivals(aircrafts)
+    merged_flights = MergeMovements(aircrafts, departures)
+    messagebox.showinfo("Info", "Fusion OK. Total: " + str(len(merged_flights)))
 
-def plot_airlines():
-    if not aircrafts:
-        messagebox.showwarning("Error", "Primero carga vuelos")
+def run_simulation():
+    if bcn == None or len(merged_flights) == 0:
+        messagebox.showerror("Error", "Faltan Datos (LEBL o Vuelos fusionados)")
         return
-    PlotAirlines(aircrafts)
-
-def plot_flights_type():
-    if not aircrafts:
-        messagebox.showwarning("Error", "Primero carga vuelos")
-        return
-    PlotFlightsType(aircrafts)
-
-def map_flights():
-    if not aircrafts:
-        messagebox.showwarning("Error", "Primero carga vuelos")
-        return
-    MapFlights(aircrafts)
-    messagebox.showinfo("Info", "Mapa flights_map.kml creado")
-
-def show_long_distance():
-    if not aircrafts:
-        messagebox.showwarning("Error", "Primero carga vuelos")
-        return
-    long_flights = LongDistanceArrivals(aircrafts)
-    win = Toplevel()
-    win.title("Vuelos Larga Distancia")
-    text = Text(win, width=60, height=10)
-    text.pack()
-    text.insert(END, f"Vuelos de larga distancia: {len(long_flights)}\n\n")
-    for a in long_flights:
-        text.insert(END, f"• {a.id}: {a.origin} -> LEBL.txt a las {a.landing_time}\n")
-    text.config(state=DISABLED)
+    PlotDayOccupancy(bcn, merged_flights)
 
 def save_flights():
-    if not aircrafts:
-        messagebox.showwarning("Error", "Primero carga vuelos")
+    lista = []
+    if len(merged_flights) > 0:
+        lista = merged_flights
+    else:
+        lista = aircrafts
+        
+    if len(lista) == 0:
         return
-    SaveFlights(aircrafts, "vuelos_guardados.txt")
-    messagebox.showinfo("Info", "Vuelos guardados en vuelos_guardados.txt")
+        
+    SaveFlights(lista, "vuelos_guardados.txt")
+    messagebox.showinfo("Info", "Guardado 'vuelos_guardados.txt'")
 
-# ==== INTERFAZ GRÁFICA ====
+def map_flights_all():
+    lista = []
+    if len(merged_flights) > 0:
+        lista = merged_flights
+    else:
+        lista = aircrafts
+        
+    if len(lista) == 0: return
+    
+    MapFlights(lista, only_long_distance=False)
+    messagebox.showinfo("Info", "KML creado.")
+
+def map_flights_long():
+    lista = []
+    if len(merged_flights) > 0:
+        lista = merged_flights
+    else:
+        lista = aircrafts
+
+    if len(lista) == 0: return
+    
+    MapFlights(lista, only_long_distance=True)
+    messagebox.showinfo("Info", "KML creado.")
+
+def plot_hours(): 
+    if len(aircrafts) > 0:
+        PlotArrivals(aircrafts)
+
+def plot_airlines(): 
+    if len(aircrafts) > 0:
+        PlotAirlines(aircrafts)
+
+def plot_schengen(): 
+    if len(aircrafts) > 0:
+        PlotFlightsType(aircrafts)
+
+
+# ==========================================
+# INTERFAZ GRÁFICA
+# ==========================================
 root = Tk()
-root.title("Sistema Aeropuertos v3")
-root.geometry("400x650")
+root.title("Gestión Aeroportuaria")
+root.geometry("450x850")
 
-titulo = Label(root, text="SISTEMA AEROPUERTOS", font=("Arial", 14, "bold"))
+titulo = Label(root, text="GESTIÓN AEROPUERTO", font=("Arial", 16, "bold"))
 titulo.pack(pady=10)
 
-# Sección Aeropuertos Genéricos
-label_airports = Label(root, text="Gestión de Aeropuertos", font=("Arial", 11))
-label_airports.pack(pady=5)
-btn_load_airports = Button(root, text="Cargar Aeropuertos", width=20, command=load_airports)
-btn_load_airports.pack(pady=2)
-btn_show_airports = Button(root, text="Mostrar Aeropuertos", width=20, command=show_airports)
-btn_show_airports.pack(pady=2)
-btn_plot_airports = Button(root, text="Gráfico Aeropuertos", width=20, command=plot_airports)
-btn_plot_airports.pack(pady=2)
-btn_map_airports = Button(root, text="Mapa Aeropuertos", width=20, command=map_airports)
-btn_map_airports.pack(pady=2)
+# --- Bloque 1 ---
+frame1 = LabelFrame(root, text="1. Aeropuertos", padx=10, pady=5)
+frame1.pack(fill="x", padx=15, pady=5)
 
-separador = Label(root, text="───────────────")
-separador.pack(pady=10)
+Button(frame1, text="Cargar Aeropuertos", command=load_airports).pack(fill="x")
+Button(frame1, text="Guardar Aeropuertos", command=save_airports).pack(fill="x")
+Button(frame1, text="Añadir", command=add_airport).pack(fill="x")
+Button(frame1, text="Eliminar", command=remove_airport).pack(fill="x")
+Button(frame1, text="Gráfico Aeropuertos", command=plot_airports).pack(fill="x")
+Button(frame1, text="Ver Mapa", command=map_airports).pack(fill="x")
 
-# Sección Vuelos LEBL.txt
-label_lebl = Label(root, text="Gestión de Aeropuerto LEBL.txt v3", font=("Arial", 11))
-label_lebl.pack(pady=5)
-btn_load_lebl = Button(root, text="Cargar Estructura LEBL.txt", width=20, command=load_lebl_structure)
-btn_load_lebl.pack(pady=2)
-btn_show_gates = Button(root, text="Mostrar Ocupación Gates", width=20, command=show_gate_occupancy)
-btn_show_gates.pack(pady=2)
-btn_assign_gates = Button(root, text="Asignar Gates a Vuelos", width=20, command=assign_gates_to_arrivals)
-btn_assign_gates.pack(pady=2)
+# --- Bloque 2 ---
+frame2 = LabelFrame(root, text="2. Infraestructura LEBL", padx=10, pady=5)
+frame2.pack(fill="x", padx=15, pady=5)
 
-separador2 = Label(root, text="───────────────")
-separador2.pack(pady=10)
+Button(frame2, text="Cargar LEBL.txt", command=load_lebl_structure).pack(fill="x")
+Button(frame2, text="Ver Estado Puertas", command=show_gate_occupancy).pack(fill="x")
+Button(frame2, text="Asignación V3", command=assign_gates_static).pack(fill="x")
 
-# Sección Vuelos Genéricos
-label_flights = Label(root, text="Gestión de Vuelos LEBL.txt", font=("Arial", 11))
-label_flights.pack(pady=5)
-btn_load_flights = Button(root, text="Cargar Vuelos", width=20, command=load_arrivals)
-btn_load_flights.pack(pady=2)
-btn_show_flights = Button(root, text="Mostrar Vuelos", width=20, command=show_flights)
-btn_show_flights.pack(pady=2)
-btn_save_flights = Button(root, text="Guardar Vuelos", width=20, command=save_flights)
-btn_save_flights.pack(pady=2)
-btn_plot_hours = Button(root, text="Gráfico por Horas", width=20, command=plot_arrivals)
-btn_plot_hours.pack(pady=2)
-btn_plot_airlines = Button(root, text="Gráfico Aerolíneas", width=20, command=plot_airlines)
-btn_plot_airlines.pack(pady=2)
-btn_plot_schengen = Button(root, text="Gráfico Schengen", width=20, command=plot_flights_type)
-btn_plot_schengen.pack(pady=2)
-btn_map_flights = Button(root, text="Mapa Vuelos", width=20, command=map_flights)
-btn_map_flights.pack(pady=2)
-btn_long_distance = Button(root, text="Vuelos Larga Distancia", width=20, command=show_long_distance)
-btn_long_distance.pack(pady=2)
+# --- Bloque 3 ---
+frame3 = LabelFrame(root, text="3. Operaciones", padx=10, pady=5)
+frame3.pack(fill="x", padx=15, pady=5)
 
-btn_exit = Button(root, text="SALIR", width=15, command=root.quit, bg="lightcoral")
-btn_exit.pack(pady=15)
+Button(frame3, text="Cargar Llegadas", command=load_arrivals).pack(fill="x")
+Button(frame3, text="Cargar Salidas", command=load_departures).pack(fill="x")
+Button(frame3, text="Fusionar Movimientos", command=merge_movements, bg="lightblue").pack(fill="x")
+
+Label(frame3, text="--- Estadísticas ---").pack(pady=2)
+Button(frame3, text="Gráfico Vuelos x Hora", command=plot_hours).pack(fill="x")
+Button(frame3, text="Gráfico x Aerolínea", command=plot_airlines).pack(fill="x")
+Button(frame3, text="Gráfico Vuelos Schengen", command=plot_schengen).pack(fill="x")
+
+Label(frame3, text="--- Mapas ---").pack(pady=2)
+Button(frame3, text="Mapa Trayectorias (Todas)", command=map_flights_all).pack(fill="x")
+Button(frame3, text="Mapa Trayectorias (>2000km)", command=map_flights_long).pack(fill="x")
+
+# Botón Principal
+Button(root, text="SIMULACIÓN DIARIA", font=("Arial", 11, "bold"), bg="lightgreen", height=2, command=run_simulation).pack(fill="x", padx=15, pady=10)
+
+Button(root, text="SALIR", command=root.quit, bg="red", fg="white").pack(pady=5)
 
 root.mainloop()
