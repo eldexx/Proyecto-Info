@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
-from airport import IsSchengenAirport
+from airport import IsSchengenAirport, LoadAirports
+import math
 
 def time_to_minutes(time_str):
     # Comprobación básica
@@ -35,6 +36,19 @@ class Aircraft:
 
     def __repr__(self):
         return "[" + self.id + "] Arr:" + self.landing_time + " Dep:" + self.departure_time
+
+def _haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # km
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+
+    a = math.sin(dphi / 2)**2 + \
+        math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2)**2
+
+    return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
 
 def LoadArrivals(filename):
     aircrafts = []
@@ -238,64 +252,64 @@ def SaveFlights(aircrafts, filename):
     except:
         return -1
 
-def MapFlights(aircrafts, only_long_distance=False):
-    if len(aircrafts) == 0:
-        print("No hay vuelos.")
+def MapFlights(aircrafts, only_long_distance=False, filename="flights.kml"):
+    if not aircrafts:
+        print("No hay vuelos")
         return
+    airports = LoadAirports("airports.txt")
+    coords = {a.code: (a.latitude, a.longitude) for a in airports}
 
-    lista_a_pintar = []
-    
-    # Filtrado manual
-    if only_long_distance == True:
-        non_european = ['C', 'K', 'P', 'R', 'U', 'Z']
-        for i in range(len(aircrafts)):
-            a = aircrafts[i]
-            if a.origin != "":
-                primera_letra = a.origin[0]
-                if primera_letra in non_european:
-                    lista_a_pintar.append(a)
-    else:
-        lista_a_pintar = aircrafts
+    if "LEBL" not in coords:
+        print("LEBL no está en el fichero de aeropuertos")
+        return
+    lat_bcn, lon_bcn = coords["LEBL"]
 
-    filename = "flights_map.kml"
-    lebl_lon = 2.0833
-    lebl_lat = 41.2974
+    try:
+        with open(filename, "w") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write('<kml xmlns="http://www.opengis.net/kml/2.2">\n')
+            f.write('<Document>\n')
 
-    f = open(filename, "w", encoding="utf-8")
-    f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-    f.write('<kml xmlns="http://www.opengis.net/kml/2.2">\n')
-    f.write('<Document>\n')
-    f.write('<name>Vuelos</name>\n')
+            for a in aircrafts:
+                if a.origin not in coords:
+                    continue
 
-    # Estilo amarillo
-    f.write('<Style id="yellowLine"><LineStyle><color>7f00ffff</color><width>4</width></LineStyle></Style>\n')
+                lat_o, lon_o = coords[a.origin]
 
-    for j in range(len(lista_a_pintar)):
-        a = lista_a_pintar[j]
-        
-        # Calculo simple para coordenadas falsas
-        offset = 0
-        if a.origin != "":
-            offset = ord(a.origin[0])
-            
-        origin_lon = lebl_lon + (offset % 20 - 10) * 5 
-        origin_lat = lebl_lat + (offset % 10 - 5) * 5
+                # Calcular distancia
+                dist = _haversine(lat_o, lon_o, lat_bcn, lon_bcn)
 
-        f.write('<Placemark>\n')
-        f.write('<name>' + a.airline + ' ' + a.id + '</name>\n')
-        f.write('<styleUrl>#yellowLine</styleUrl>\n')
-        f.write('<LineString>\n')
-        f.write('<extrude>1</extrude><tessellate>1</tessellate>\n')
-        f.write('<coordinates>\n')
-        f.write(str(origin_lon) + ',' + str(origin_lat) + ',0\n')
-        f.write(str(lebl_lon) + ',' + str(lebl_lat) + ',0\n')
-        f.write('</coordinates>\n')
-        f.write('</LineString>\n')
-        f.write('</Placemark>\n')
+                # Filtrado larga distancia
+                if only_long_distance and dist <= 2000:
+                    continue
 
-    f.write('</Document>\n')
-    f.write('</kml>\n')
-    f.close()
-    
-    print("Mapa generado.")
+                # Color por Schengen
+                if IsSchengenAirport(a.origin):
+                    color = "ff00ff00"  # verde
+                else:
+                    color = "ff0000ff"  # rojo
+
+                f.write('<Placemark>\n')
+                f.write(f'<name>{a.id}</name>\n')
+                f.write('<Style>\n')
+                f.write('<LineStyle>\n')
+                f.write(f'<color>{color}</color>\n')
+                f.write('<width>2</width>\n')
+                f.write('</LineStyle>\n')
+                f.write('</Style>\n')
+
+                f.write('<LineString>\n')
+                f.write('<coordinates>\n')
+                # ORIGEN -> BARCELONA (lon,lat,alt)
+                f.write(f'{lon_o},{lat_o},0\n')
+                f.write(f'{lon_bcn},{lat_bcn},0\n')
+                f.write('</coordinates>\n')
+                f.write('</LineString>\n')
+                f.write('</Placemark>\n')
+
+            f.write('</Document>\n')
+            f.write('</kml>\n')
+
+    except Exception as e:
+        print("Error creating KML:", e)
     

@@ -68,7 +68,7 @@ def LoadAirlines(terminal, tname):
         return -1
 
 def SetGates(area, initgate, endgate, prefix):
-    if endgate < initgate:
+    if endgate <= initgate:
         return -1
     
     area.gates = []

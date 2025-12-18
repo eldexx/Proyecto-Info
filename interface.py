@@ -3,7 +3,7 @@ from tkinter import messagebox, simpledialog
 
 from aircraft import *
 from airport import *
-from LEBL import BarcelonaAP, LoadAirportStructure, AssignGate, GateOccupancy, PlotDayOccupancy
+from LEBL import *
 
 # Variables Globales
 airports = []
@@ -107,39 +107,48 @@ def load_lebl_structure():
         messagebox.showerror("Error", "No se encontró 'LEBL.txt'.")
 
 def show_gate_occupancy():
-    if bcn == None:
-        messagebox.showwarning("Error", "Carga la estructura primero.")
+    if bcn is None:
+        messagebox.showwarning("Error", "Carga la estructura del aeropuerto primero.")
         return
+    alguna_ocupada = False
+    for t in bcn.terminales:
+        for ba in t.boarding_areas:
+            for g in ba.gates:
+                if g.ocupado:
+                    alguna_ocupada = True
+
+    if not alguna_ocupada:
+        messagebox.showinfo(
+            "Aviso",
+            "Todas las puertas están libres.\n\n"
+            "¿Has asignado gates a los vuelos?\n"
+            "Pulsa primero: 'Asignar puertas'."
+        )
+
     win = Toplevel()
-    win.title("Ocupación de Puertas")
-    text = Text(win, width=85, height=20)
-    text.pack()
-    
-    text.insert(END, "GATE      ESTADO         AVIÓN          LIBERA (min)\n")
-    text.insert(END, "====================================================\n")
-    
-    datos = GateOccupancy(bcn)
-    
-    for i in range(len(datos)):
-        dato = datos[i]
-        
-        if dato["ocupado"] == True:
-            oc = "OCUPADO"
-        else:
-            oc = "Libre"
-            
-        avi = "---"
-        if "id" in dato:
-            if dato["id"] != None:
-                avi = dato["id"]
-        
-        free = "-"
-        if "free_at" in dato:
-            free = str(dato["free_at"])
-        
-        linea = dato["gate"] + "\t" + oc + "\t" + avi + "\t" + free + "\n"
-        text.insert(END, linea)
-        
+    win.title("Ocupación de Gates - LEBL")
+    win.geometry("700x500")
+
+    text = Text(win, width=85, height=25)
+    text.pack(padx=10, pady=10)
+
+    text.insert(END, "TERMINAL | AREA | GATE | ESTADO | AVIÓN\n")
+    text.insert(END, "===============================================\n")
+
+    for t in bcn.terminales:
+        text.insert(END, f"\n--- TERMINAL {t.nombre} ---\n")
+
+        for ba in t.boarding_areas:
+            tipo = "Schengen" if ba.tipo else "Non-Schengen"
+            text.insert(END, f" Área {ba.nombre} ({tipo})\n")
+
+            for g in ba.gates:
+                estado = "OCUPADA" if g.ocupado else "LIBRE"
+                avion = g.id_aeronave if g.id_aeronave else "-"
+
+                linea = f"    {g.nombre:12} | {estado:7} | {avion}\n"
+                text.insert(END, linea)
+
     text.config(state=DISABLED)
 
 def assign_gates_static():
@@ -241,6 +250,33 @@ def plot_schengen():
     if len(aircrafts) > 0:
         PlotFlightsType(aircrafts)
 
+def assign_gates_dynamic_day():
+    if bcn is None or len(merged_flights) == 0:
+        messagebox.showerror(
+            "Error",
+            "Carga la estructura LEBL y fusiona llegadas + salidas primero."
+        )
+        return
+
+    # Resetear gates
+    for t in bcn.terminales:
+        for ba in t.boarding_areas:
+            for g in ba.gates:
+                g.liberar()
+
+    no_asignados_total = 0
+
+    for h in range(24):
+        time_str = f"{h:02d}:00"
+        no_asignados = AssignGatesAtTime(bcn, merged_flights, time_str)
+        no_asignados_total += no_asignados[1]
+
+    messagebox.showinfo(
+        "Simulación completada",
+        f"Asignación dinámica finalizada.\n"
+        f"Vuelos no asignados: {no_asignados_total}"
+    )
+
 
 # ==========================================
 # INTERFAZ GRÁFICA
@@ -269,7 +305,7 @@ frame2.pack(fill="x", padx=15, pady=5)
 
 Button(frame2, text="Cargar LEBL.txt", command=load_lebl_structure).pack(fill="x")
 Button(frame2, text="Ver Estado Puertas", command=show_gate_occupancy).pack(fill="x")
-Button(frame2, text="Asignación V3", command=assign_gates_static).pack(fill="x")
+Button(frame2, text="Asignar puertas", command=assign_gates_static).pack(fill="x")
 
 # --- Bloque 3 ---
 frame3 = LabelFrame(root, text="3. Operaciones", padx=10, pady=5)
@@ -278,6 +314,7 @@ frame3.pack(fill="x", padx=15, pady=5)
 Button(frame3, text="Cargar Llegadas", command=load_arrivals).pack(fill="x")
 Button(frame3, text="Cargar Salidas", command=load_departures).pack(fill="x")
 Button(frame3, text="Fusionar Movimientos", command=merge_movements, bg="lightblue").pack(fill="x")
+Button(frame3, text="Asignar puertas por hora", command=assign_gates_dynamic_day).pack(fill="x")
 
 Label(frame3, text="--- Estadísticas ---").pack(pady=2)
 Button(frame3, text="Gráfico Vuelos x Hora", command=plot_hours).pack(fill="x")
@@ -289,7 +326,7 @@ Button(frame3, text="Mapa Trayectorias (Todas)", command=map_flights_all).pack(f
 Button(frame3, text="Mapa Trayectorias (>2000km)", command=map_flights_long).pack(fill="x")
 
 # Botón Principal
-Button(root, text="SIMULACIÓN DIARIA", font=("Arial", 11, "bold"), bg="lightgreen", height=2, command=run_simulation).pack(fill="x", padx=15, pady=10)
+Button(root, text="Grafico de ocupacion por hora", font=("Arial", 11, "bold"), bg="lightgreen", height=2, command=run_simulation).pack(fill="x", padx=15, pady=10)
 
 Button(root, text="SALIR", command=root.quit, bg="red", fg="white").pack(pady=5)
 
